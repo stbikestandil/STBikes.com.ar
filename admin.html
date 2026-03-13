@@ -230,6 +230,9 @@ textarea{resize:vertical;min-height:80px;}
 
 <script>
 // ── PASSWORD ─────────────────────────────────────────────────
+// Contraseña por defecto: "stbikes" (se puede cambiar desde el panel)
+var DEFAULT_PASS_HASH = 'b08c3d1d8422087343778f86f901610dbdb53eedf7775710a74b8d0087564f0e';
+
 async function hashPassword(pass) {
   var encoded = new TextEncoder().encode(pass);
   var buffer = await crypto.subtle.digest('SHA-256', encoded);
@@ -238,7 +241,7 @@ async function hashPassword(pass) {
 }
 
 function getPasswordHash() {
-  return localStorage.getItem('stbikes_admin_pass') || null;
+  return localStorage.getItem('stbikes_admin_pass') || DEFAULT_PASS_HASH;
 }
 
 function setPasswordHash(hash) {
@@ -250,14 +253,6 @@ async function loginSubmit() {
   if (!pass) { document.getElementById('loginError').textContent = 'Ingresá una contraseña'; return; }
   var hash = await hashPassword(pass);
   var stored = getPasswordHash();
-  if (!stored) {
-    // First time: set this as the password
-    setPasswordHash(hash);
-    sessionStorage.setItem('stbikes_auth', '1');
-    document.getElementById('loginOverlay').classList.add('hidden');
-    showToast('Contraseña configurada. Recordala para futuros accesos.');
-    return;
-  }
   if (hash === stored) {
     sessionStorage.setItem('stbikes_auth', '1');
     document.getElementById('loginOverlay').classList.add('hidden');
@@ -288,12 +283,6 @@ async function changePassword() {
 // Check session on load
 if (sessionStorage.getItem('stbikes_auth') === '1') {
   document.getElementById('loginOverlay').classList.add('hidden');
-} else {
-  var stored = getPasswordHash();
-  if (!stored) {
-    document.getElementById('loginError').textContent = 'Primera vez: elegí una contraseña para el admin';
-    document.getElementById('loginError').style.color = 'var(--teal)';
-  }
 }
 
 // ── STORAGE ───────────────────────────────────────────────────
