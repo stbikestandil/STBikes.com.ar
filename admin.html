@@ -81,7 +81,10 @@ textarea{resize:vertical;min-height:80px;}
 
 .preview-link{display:inline-flex;align-items:center;gap:6px;color:var(--teal);font-size:.78rem;text-decoration:none;padding:6px 14px;border:1px solid rgba(0,201,177,.3);border-radius:4px;}
 .preview-link:hover{background:rgba(0,201,177,.06);}
-
+.stock-badge{font-size:.7rem;margin-top:6px;padding:4px 10px;border-radius:3px;font-weight:600;display:inline-block;}
+.stock-badge-available{background:rgba(0,201,177,.15);color:var(--teal);}
+.stock-badge-empty{background:rgba(229,85,85,.15);color:var(--red);}
+  
 /* LOGIN OVERLAY */
 .login-overlay{position:fixed;inset:0;background:#0e0e0e;z-index:1000;display:flex;align-items:center;justify-content:center;}
 .login-overlay.hidden{display:none;}
@@ -144,6 +147,11 @@ textarea{resize:vertical;min-height:80px;}
       <div class="form-group">
         <label>Cuotas (opcional)</label>
         <input id="fCuotas" placeholder="Ej: 12 cuotas sin interés">
+      </div>
+      <div class="form-group">
+        <label>Stock</label>
+        <input id="fStock" type="number" placeholder="0" min="0">
+        <span class="form-hint">Cantidad de bicicletas disponibles</span>
       </div>
       <div class="form-group">
         <label>Etiqueta</label>
@@ -305,6 +313,7 @@ function resetForm() {
   document.getElementById('fPrecio').value = '';
   document.getElementById('fCuotas').value = '';
   document.getElementById('fEtiqueta').value = '';
+  document.getElementById('fStock').value = '0';
   document.getElementById('fFoto').value = '';
   document.getElementById('fDesc').value = '';
   document.getElementById('editingId').value = '';
@@ -336,7 +345,8 @@ function saveProduct() {
     cuotas: document.getElementById('fCuotas').value.trim(),
     etiqueta: document.getElementById('fEtiqueta').value,
     foto: document.getElementById('fFoto').value.trim(),
-    descripcion: desc
+    descripcion: desc,
+    stock: parseInt(document.getElementById('fStock').value) || 0
   };
   if (editId) {
     var idx = products.findIndex(function(p){ return p.id === editId; });
@@ -359,6 +369,7 @@ function editProduct(id) {
   document.getElementById('fPrecio').value = p.precio;
   document.getElementById('fCuotas').value = p.cuotas || '';
   document.getElementById('fEtiqueta').value = p.etiqueta || '';
+  document.getElementById('fStock').value = p.stock || 0;
   document.getElementById('fFoto').value = p.foto || '';
   document.getElementById('fDesc').value = p.descripcion;
   document.getElementById('editingId').value = p.id;
@@ -420,12 +431,15 @@ function renderList() {
     var imgHtml = p.foto
       ? '<img class="product-thumb" src="' + p.foto + '" onerror="this.style.display=\'none\'" alt="">'
       : '<div class="product-thumb-placeholder">&#128690;</div>';
+    var stockClass = p.stock > 0 ? 'stock-badge-available' : 'stock-badge-empty';
+    var stockText = p.stock > 0 ? 'Stock: ' + p.stock : 'Sin stock';
     html += '<div class="product-row">' +
       imgHtml +
       '<div class="product-info">' +
         '<div class="product-info-top"><span class="product-marca">' + p.marca + '</span>' + tagHtml + '</div>' +
         '<div class="product-nombre">' + p.nombre + '</div>' +
         '<div class="product-precio">' + p.precio + (p.cuotas ? ' &middot; ' + p.cuotas : '') + '</div>' +
+        '<div class="stock-badge ' + stockClass + '">' + stockText + '</div>' +
       '</div>' +
       '<div class="product-actions">' +
         (i > 0 ? '<button class="btn btn-outline btn-sm" onclick="moveUp(\'' + p.id + '\')" title="Subir">&#8593;</button>' : '') +
