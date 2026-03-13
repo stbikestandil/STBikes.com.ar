@@ -303,29 +303,50 @@ footer p{font-size:.72rem;color:#333;}
 var WPP = '5492494552890';
 var BIKE_SVG = '<svg viewBox="0 0 120 80" fill="none"><circle cx="25" cy="58" r="18" stroke="#00c9b1" stroke-width="2.5"/><circle cx="95" cy="58" r="18" stroke="#00c9b1" stroke-width="2.5"/><path d="M25 58L55 20L95 58" stroke="white" stroke-width="2.5" fill="none"/><path d="M55 20L70 40L95 58" stroke="white" stroke-width="2"/><path d="M45 20H65" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="55" cy="20" r="4" fill="#00c9b1"/></svg>';
 
-// ── PRODUCTS ─────────────────────────────────────────────────
 function getProducts() {
   try { return JSON.parse(localStorage.getItem('stbikes_products') || '[]'); } catch(e) { return []; }
 }
 
-// ── CART ─────────────────────────────────────────────────────
+function saveProducts(products) {
+  localStorage.setItem('stbikes_products', JSON.stringify(products));
+}
+
 function getCart() {
   try { return JSON.parse(localStorage.getItem('stbikes_cart') || '[]'); } catch(e) { return []; }
 }
+
 function saveCart(cart) { localStorage.setItem('stbikes_cart', JSON.stringify(cart)); }
 
 function addToCart(id) {
   var products = getProducts();
   var product = products.find(function(p){ return p.id === id; });
   if (!product) return;
-  var cart = getCart();
-  var item = cart.find(function(c){ return c.id === id; });
-  if (item) { item.qty++; } else { cart.push({id: product.id, nombre: product.nombre, marca: product.marca, precio: product.precio, foto: product.foto, qty: 1}); }
-  saveCart(cart);
-  updateCartUI();
-  showToast(product.nombre + ' agregada al carrito');
-  var btn = document.getElementById('btn-' + id);
-  if (btn) { btn.classList.add('added'); btn.textContent = '✓ Agregada'; setTimeout(function(){ btn.classList.remove('added'); btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar'; }, 1800); }
+  
+  if (product.variantes && product.variantes.length > 0) {
+    var coloresDisponibles = product.variantes.map(v => v.color).join(', ');
+    var color = prompt('Elige color:\n' + coloresDisponibles);
+    if (!color) return;
+    
+    var variante = product.variantes.find(v => v.color === color);
+    if (!variante) { showToast('Color no disponible'); return; }
+    
+    var tallesDisponibles = variante.talles.filter(t => t.stock > 0).map(t => t.talle).join(', ');
+    if (tallesDisponibles.length === 0) { showToast('Sin stock en este color'); return; }
+    
+    var talle = prompt('Elige talle:\n' + tallesDisponibles);
+    if (!talle) return;
+    
+    var talleInfo = variante.talles.find(t => t.talle === talle);
+    if (!talleInfo || talleInfo.stock === 0) { showToast('Sin stock en ' + color + ' - ' + talle); return; }
+    
+    var cart = getCart();
+    cart.push({ id: product.id, nombre: product.nombre, marca: product.marca, precio: product.precio, foto: product.foto, color: color, talle: talle, qty: 1 });
+    saveCart(cart);
+    updateCartUI();
+    showToast(product.nombre + ' (' + color + ', ' + talle + ') agregada al carrito');
+    var btn = document.getElementById('btn-' + id);
+    if (btn) { btn.classList.add('added'); btn.textContent = '✓ Agregada'; setTimeout(function(){ btn.classList.remove('added'); btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar'; }, 1800); }
+  }
 }
 
 function changeQty(id, delta) {
@@ -342,43 +363,21 @@ function clearCart() { saveCart([]); updateCartUI(); }
 
 function updateCartUI() {
   var cart = getCart();
-  var total = 0;
-  var count = 0;
+  var total = 0, count = 0;
   cart.forEach(function(item){ count += item.qty; });
-
-  // Count badge
   var badge = document.getElementById('cartCount');
-  if (count > 0) { badge.textContent = count; badge.classList.add('show'); }
-  else { badge.classList.remove('show'); }
-
-  // Cart items
+  if (count > 0) { badge.textContent = count; badge.classList.add('show'); } else { badge.classList.remove('show'); }
+  
   var el = document.getElementById('cartItems');
-  if (cart.length === 0) {
-    el.innerHTML = '<div class="cart-empty">Tu carrito est&aacute; vac&iacute;o</div>';
-    document.getElementById('cartTotal').textContent = '$0';
-    return;
-  }
-
+  if (cart.length === 0) { el.innerHTML = '<div class="cart-empty">Tu carrito está vacío</div>'; document.getElementById('cartTotal').textContent = '$0'; return; }
+  
   var html = '';
   cart.forEach(function(item) {
     var priceNum = parseFloat(String(item.precio).replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
     total += priceNum * item.qty;
-    var imgHtml = item.foto
-      ? '<img class="cart-item-img" src="' + item.foto + '" alt="' + item.nombre + '">'
-      : '<div class="cart-item-img-placeholder">' + BIKE_SVG + '</div>';
-    html += '<div class="cart-item">' + imgHtml +
-      '<div class="cart-item-info">' +
-        '<div class="cart-item-brand">' + item.marca + '</div>' +
-        '<div class="cart-item-name">' + item.nombre + '</div>' +
-        '<div class="cart-item-row">' +
-          '<span class="cart-item-price">' + item.precio + '</span>' +
-          '<div class="cart-item-qty">' +
-            '<button class="qty-btn" onclick="changeQty(\'' + item.id + '\',-1)">&#8722;</button>' +
-            '<span class="qty-num">' + item.qty + '</span>' +
-            '<button class="qty-btn" onclick="changeQty(\'' + item.id + '\',1)">&#43;</button>' +
-          '</div>' +
-        '</div>' +
-      '</div></div>';
+    var imgHtml = item.foto ? '<img class="cart-item-img" src="' + item.foto + '" alt="' + item.nombre + '">' : '<div class="cart-item-img-placeholder">' + BIKE_SVG + '</div>';
+    var variantInfo = item.color ? ' (' + item.color + ', ' + item.talle + ')' : '';
+    html += '<div class="cart-item">' + imgHtml + '<div class="cart-item-info"><div class="cart-item-brand">' + item.marca + '</div><div class="cart-item-name">' + item.nombre + variantInfo + '</div><div class="cart-item-row"><span class="cart-item-price">' + item.precio + '</span><div class="cart-item-qty"><button class="qty-btn" onclick="changeQty(\'' + item.id + '\',-1)">&#8722;</button><span class="qty-num">' + item.qty + '</span><button class="qty-btn" onclick="changeQty(\'' + item.id + '\',1)">&#43;</button></div></div></div></div>';
   });
   el.innerHTML = html;
   document.getElementById('cartTotal').textContent = total > 0 ? '$' + total.toLocaleString('es-AR') : 'Consultar';
@@ -392,51 +391,50 @@ function toggleCart() {
 
 function checkout() {
   var cart = getCart();
-  if (cart.length === 0) { showToast('Tu carrito est\u00e1 vac\u00edo'); return; }
+  if (cart.length === 0) { showToast('Tu carrito está vacío'); return; }
+  var products = getProducts();
+  cart.forEach(function(item) {
+    var product = products.find(p => p.id === item.id);
+    if (product && product.variantes) {
+      var variante = product.variantes.find(v => v.color === item.color);
+      if (variante) { var talleInfo = variante.talles.find(t => t.talle === item.talle); if (talleInfo) { talleInfo.stock -= item.qty; if (talleInfo.stock < 0) talleInfo.stock = 0; } }
+    }
+  });
+  saveProducts(products);
   var lines = ['Hola! Quiero comprar:'];
   var total = 0;
   cart.forEach(function(item) {
     var priceNum = parseFloat(String(item.precio).replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
     total += priceNum * item.qty;
-    lines.push('- ' + item.qty + 'x ' + item.marca + ' ' + item.nombre + ' (' + item.precio + ')');
+    var variantInfo = item.color ? ' (' + item.color + ', ' + item.talle + ')' : '';
+    lines.push('- ' + item.qty + 'x ' + item.marca + ' ' + item.nombre + variantInfo + ' (' + item.precio + ')');
   });
   if (total > 0) lines.push('Total: $' + total.toLocaleString('es-AR'));
   lines.push('Consulto por disponibilidad y forma de pago.');
   window.open('https://wa.me/' + WPP + '?text=' + encodeURIComponent(lines.join('\n')), '_blank');
+  clearCart();
 }
 
-// ── GRID ─────────────────────────────────────────────────────
 function buildGrid() {
   var products = getProducts();
   var grid = document.getElementById('bikesGrid');
-  if (products.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><svg width="60" height="40" viewBox="0 0 120 80" fill="none"><circle cx="25" cy="58" r="18" stroke="#333" stroke-width="2.5"/><circle cx="95" cy="58" r="18" stroke="#333" stroke-width="2.5"/><path d="M25 58L55 20L95 58" stroke="#333" stroke-width="2.5" fill="none"/></svg><p>El cat\u00e1logo est\u00e1 siendo actualizado. Vuelve pronto!</p></div>';
-    return;
-  }
+  if (products.length === 0) { grid.innerHTML = '<div class="empty-state"><svg width="60" height="40" viewBox="0 0 120 80" fill="none"><circle cx="25" cy="58" r="18" stroke="#333" stroke-width="2.5"/><circle cx="95" cy="58" r="18" stroke="#333" stroke-width="2.5"/><path d="M25 58L55 20L95 58" stroke="#333" stroke-width="2.5" fill="none"/></svg><p>El catálogo está siendo actualizado. ¡Vuelve pronto!</p></div>'; return; }
   var html = '';
   products.forEach(function(p) {
+    var hayStock = false;
+    if (p.variantes) { hayStock = p.variantes.some(v => v.talles.some(t => t.stock > 0)); } else { hayStock = true; }
+    var estadoStock = hayStock ? 'En Stock' : 'Sin Stock';
+    var colorStock = hayStock ? '#00c9b1' : '#ef4444';
     var tagClass = p.etiqueta === 'Oferta' ? ' oferta' : p.etiqueta === 'Nuevo' ? ' nuevo' : '';
     var tagHtml = p.etiqueta ? '<span class="bike-tag' + tagClass + '">' + p.etiqueta + '</span>' : '';
     var imgHtml = p.foto ? '<img class="bike-img" src="' + p.foto + '" alt="' + p.nombre + '" loading="lazy">' : '<div class="bike-placeholder">' + BIKE_SVG + '</div>';
-    html += '<div class="bike-card reveal">' +
-      '<div class="bike-img-wrap">' + imgHtml + tagHtml + '</div>' +
-      '<div class="bike-info">' +
-        '<div class="bike-brand">' + p.marca + '</div>' +
-        '<div class="bike-name">' + p.nombre + '</div>' +
-        '<div class="bike-desc">' + p.descripcion + '</div>' +
-        '<div class="bike-footer">' +
-          '<div class="bike-price">' + p.precio + '<small>' + (p.cuotas || '') + '</small></div>' +
-          '<button class="btn-add" id="btn-' + p.id + '" onclick="addToCart(\'' + p.id + '\')">' +
-            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar' +
-          '</button>' +
-        '</div>' +
-      '</div></div>';
+    var btnDisabled = hayStock ? '' : ' disabled style="opacity:0.5; cursor:not-allowed;"';
+    html += '<div class="bike-card reveal"><div class="bike-img-wrap">' + imgHtml + tagHtml + '<div style="position:absolute;bottom:12px;right:12px;background:' + colorStock + ';color:#000;padding:4px 10px;border-radius:4px;font-size:0.7rem;font-weight:700;">' + estadoStock + '</div></div><div class="bike-info"><div class="bike-brand">' + p.marca + '</div><div class="bike-name">' + p.nombre + '</div><div class="bike-desc">' + p.descripcion + '</div><div class="bike-footer"><div class="bike-price">' + p.precio + '<small>' + (p.cuotas || '') + '</small></div><button class="btn-add" id="btn-' + p.id + '" onclick="addToCart(\'' + p.id + '\')"' + btnDisabled + '><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar</button></div></div></div>';
   });
   grid.innerHTML = html;
   document.querySelectorAll('.reveal').forEach(function(el){ observer.observe(el); });
 }
 
-// ── TOAST ─────────────────────────────────────────────────────
 function showToast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -444,7 +442,6 @@ function showToast(msg) {
   setTimeout(function(){ t.classList.remove('show'); }, 2200);
 }
 
-// ── SCROLL REVEAL ─────────────────────────────────────────────
 var observer = new IntersectionObserver(function(entries) {
   entries.forEach(function(entry, i) {
     if (entry.isIntersecting) setTimeout(function(){ entry.target.classList.add('visible'); }, i * 80);
@@ -452,7 +449,6 @@ var observer = new IntersectionObserver(function(entries) {
 }, { threshold: 0.08 });
 document.querySelectorAll('.reveal').forEach(function(el){ observer.observe(el); });
 
-// ── INIT ──────────────────────────────────────────────────────
 buildGrid();
 updateCartUI();
 </script>
